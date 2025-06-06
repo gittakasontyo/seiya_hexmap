@@ -7,26 +7,41 @@
   <style>
     body { margin: 0; }
     svg { width: 100vw; height: 100vh; background-color: #f9f9f9; }
-	#tooltip {
-	  position: absolute;
-	  display: none;
-	  background-color: rgba(255, 255, 255, 0.95);
-	  border: 1px solid #888;
-	  padding: 6px 10px;
-	  font-size: 14px;
-	  line-height: 1.5;
-	  max-width: 300px;
-	  white-space: pre-line;
-	  pointer-events: none;
-	  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-	  border-radius: 6px;
-	  z-index: 10;
-	}
+
+    .tooltip-wrapper {
+      transform-origin: top left;
+      position: absolute;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    #tooltip {
+      display: none;
+      background-color: rgba(255, 255, 255, 0.95);
+      border: 1px solid #888;
+      padding: 6px 10px;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 300px;
+      white-space: pre-line;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+      border-radius: 6px;
+    }
+
+    @media (hover: none) and (pointer: coarse) {
+      #tooltip {
+        font-size: 20px;
+        padding: 12px 16px;
+        max-width: 90vw;
+      }
+    }
   </style>
 </head>
 <body>
 <svg id="hexmap"></svg>
-<div id="tooltip"></div>
+<div class="tooltip-wrapper" id="tooltipWrapper">
+  <div id="tooltip"></div>
+</div>
 <script>
 const csvUrl = "seiyaMap.csv?t=" + new Date().getTime();
 const hexRadius = 40;
@@ -79,45 +94,39 @@ function getTextColorByFighter(fighter = "") {
 }
 
 function applyTooltip(selection, cell) {
-  let tooltipVisible = false;
   selection
     .on("mouseover", () => {
       if (!isTouchDevice()) {
         tooltip
           .style("display", "block")
-          .html(
-            `<strong>${cell.fighter}</strong><br>` +
+          .html(`<strong>${cell.fighter}</strong><br>` +
             (cell.enemy1 ? `敵1: ${cell.enemy1}<br>` : "") +
             (cell.enemy2 ? `敵2: ${cell.enemy2}<br>` : "") +
-            (cell.enemy3 ? `敵3: ${cell.enemy3}` : "")
-          );
+            (cell.enemy3 ? `敵3: ${cell.enemy3}` : ""));
       }
     })
     .on("mousemove", (event) => {
       if (!isTouchDevice()) {
-        tooltip
+        tooltipWrapper
           .style("left", `${event.pageX + 10}px`)
           .style("top", `${event.pageY + 10}px`);
       }
     })
     .on("mouseout", () => {
-      if (!isTouchDevice()) {
-        tooltip.style("display", "none");
-      }
+      if (!isTouchDevice()) tooltip.style("display", "none");
     })
     .on("click", (event) => {
       if (isTouchDevice()) {
         event.stopPropagation();
         tooltip
           .style("display", tooltip.style("display") === "block" ? "none" : "block")
-          .style("left", `${event.pageX + 10}px`)
-          .style("top", `${event.pageY + 10}px`)
-          .html(
-            `<strong>${cell.fighter}</strong><br>` +
+          .html(`<strong>${cell.fighter}</strong><br>` +
             (cell.enemy1 ? `敵1: ${cell.enemy1}<br>` : "") +
             (cell.enemy2 ? `敵2: ${cell.enemy2}<br>` : "") +
-            (cell.enemy3 ? `敵3: ${cell.enemy3}` : "")
-          );
+            (cell.enemy3 ? `敵3: ${cell.enemy3}` : ""));
+        tooltipWrapper
+          .style("left", `${event.pageX + 10}px`)
+          .style("top", `${event.pageY + 10}px`);
       }
     });
 }
@@ -125,22 +134,16 @@ function applyTooltip(selection, cell) {
 const svg = d3.select("#hexmap");
 const g = svg.append("g");
 const tooltip = d3.select("#tooltip");
+const tooltipWrapper = d3.select("#tooltipWrapper");
 
 const zoom = d3.zoom()
   .scaleExtent([0.2, 5])
   .on("zoom", (event) => {
     const transform = event.transform;
     g.attr("transform", transform);
-    const scale = transform.k;
-    
-    // ⬇ tooltip全体をズーム倍率に応じて拡大縮小
-    tooltip.style("transform", `scale(${transform.k})`);
-    
-   // ✅ スマホは固定サイズ、PCはスケーリング
-   //const isMobile = window.innerWidth < 768;
-   //const scaledSize = isMobile ? 24 : Math.max(6, Math.min(12, 8 * scale));
-   //tooltip.style("font-size", `${scaledSize}px`);
+    tooltipWrapper.style("transform", `scale(${transform.k})`);
   });
+
 svg.call(zoom);
 document.body.addEventListener("click", () => tooltip.style("display", "none"));
 
