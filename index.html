@@ -132,9 +132,11 @@ const zoom = d3.zoom()
     const transform = event.transform;
     g.attr("transform", transform);
     const scale = transform.k;
-    tooltip.style("font-size", `${Math.max(6, Math.min(12, 8 * scale))}px`);
+   // ✅ スマホは固定サイズ、PCはスケーリング
+   const isMobile = window.innerWidth < 768;
+   const scaledSize = isMobile ? 12 : Math.max(6, Math.min(12, 8 * scale));
+   tooltip.style("font-size", `${scaledSize}px`);
   });
-
 svg.call(zoom);
 document.body.addEventListener("click", () => tooltip.style("display", "none"));
 
