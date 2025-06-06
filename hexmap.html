@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ヘキサマップ（ランク上部表示）</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body { margin: 0; }
+    svg { width: 100vw; height: 100vh; background-color: #f9f9f9; }
+    #tooltip {
+      position: absolute;
+      display: none;
+      background-color: rgba(255, 255, 255, 0.95);
+      border: 1px solid #888;
+      padding: 2px 6px;
+      font-size: 8px;
+      pointer-events: none;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      border-radius: 3px;
+      white-space: pre-line;
+      max-width: 180px;
+      line-height: 1.3;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+<svg id="hexmap"></svg>
+<div id="tooltip"></div>
+<script>
+const csvUrl = "seiyaMap.csv?t=" + new Date().getTime();
+const hexRadius = 40;
+const sqrt3 = Math.sqrt(3);
+
+function hexToPixel(col, row) {
+  return [
+    hexRadius * sqrt3 * (col + 0.5 * (row % 2)),
+    hexRadius * 1.5 * row
+  ];
+}
+
+function polygonPath(x, y) {
+  let path = "";
+  for (let i = 0; i < 6; i++) {
+    const angle = Math.PI / 180 * (60 * i - 30);
+    const px = x + hexRadius * Math.cos(angle);
+    const py = y + hexRadius * Math.sin(angle);
+    path += (i === 0 ? "M" : "L") + px + "," + py;
+  }
+  return path + "Z";
+}
+
+function isTouchDevice() {
+  return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+}
+
+function getRankColor(rank) {
+  const match = rank.match(/\d+/);
+  const rankNum = match ? parseInt(match[0]) : null;
+  switch (rankNum) {
+    case 1: return "#cccccc";
+    case 2: return "#ffff99";
+    case 3: return "#ffcc66";
+    case 4: return "#ff9966";
+    case 5: return "#ff6666";
+    case 6: return "#cc3333";
+    default: return "#ffffff";
+  }
+}
+
+function getTextColorByFighter(fighter = "") {
+  if (fighter.includes("風")) return "#007700";
+  if (fighter.includes("水")) return "#005577";
+  if (fighter.includes("火") || fighter.includes("炎")) return "#cc0000";
+  if (fighter.includes("土")) return "#8b4513";
+  if (fighter.includes("光")) return "#ccaa00";
+  if (fighter.includes("闇")) return "#660099";
+  return "#000000";
+}
+
+function applyTooltip(selection, cell) {
+  let tooltipVisible = false;
+  selection
+    .on("mouseover", () => {
+      if (!isTouchDevice()) {
+        tooltip
+          .style("display", "block")
+          .html(
+            `<strong>${cell.fighter}</strong><br>` +
+            (cell.enemy1 ? `敵1: ${cell.enemy1}<br>` : "") +
+            (cell.enemy2 ? `敵2: ${cell.enemy2}<br>` : "") +
+            (cell.enemy3 ? `敵3: ${cell.enemy3}` : "")
+          );
+      }
+    })
+    .on("mousemove", (event) => {
+      if (!isTouchDevice()) {
+        tooltip
+          .style("left", `${event.pageX + 10}px`)
+          .style("top", `${event.pageY + 10}px`);
+      }
+    })
+    .on("mouseout", () => {
+      if (!isTouchDevice()) {
+        tooltip.style("display", "none");
+      }
+    })
+    .on("click", (event) => {
+      if (isTouchDevice()) {
+        event.stopPropagation();
+        tooltip
+          .style("display", tooltip.style("display") === "block" ? "none" : "block")
+          .style("left", `${event.pageX + 10}px`)
+          .style("top", `${event.pageY + 10}px`)
+          .html(
+            `<strong>${cell.fighter}</strong><br>` +
+            (cell.enemy1 ? `敵1: ${cell.enemy1}<br>` : "") +
+            (cell.enemy2 ? `敵2: ${cell.enemy2}<br>` : "") +
+            (cell.enemy3 ? `敵3: ${cell.enemy3}` : "")
+          );
+      }
+    });
+}
+
+const svg = d3.select("#hexmap");
+const g = svg.append("g");
+const tooltip = d3.select("#tooltip");
+
+const zoom = d3.zoom()
+  .scaleExtent([0.2, 5])
+  .on("zoom", (event) => {
+    const transform = event.transform;
+    g.attr("transform", transform);
+    const scale = transform.k;
+    tooltip.style("font-size", `${Math.max(6, Math.min(12, 8 * scale))}px`);
+  });
+
+svg.call(zoom);
+document.body.addEventListener("click", () => tooltip.style("display", "none"));
+
+d3.csv(csvUrl).then(rawData => {
+  const data = rawData
+    .filter(d => d["エリア"])
+    .map(d => {
+      const area = parseFloat(d["エリア"]);
+      return {
+        col: Math.floor(area),
+        row: Math.round((area % 1) * 100),
+        rank: d["タウンランク"] || "",
+        fighter: d["派遣闘士"] || "",
+        enemy1: d["敵①"] || "",
+        enemy2: d["敵②"] || "",
+        enemy3: d["敵③"] || ""
+      };
+    });
+
+  const dataMap = new Map(data.map(d => [`${d.col},${d.row}`, d]));
+  const cols = data.map(d => d.col), rows = data.map(d => d.row);
+  const colMin = Math.min(...cols) - 1, colMax = Math.max(...cols) + 1;
+  const rowMin = Math.min(...rows) - 1, rowMax = Math.max(...rows) + 1;
+
+  for (let row = rowMin; row <= rowMax; row++) {
+    for (let col = colMin; col <= colMax; col++) {
+      const [x, y] = hexToPixel(col, row);
+      const key = `${col},${row}`;
+      const cell = dataMap.get(key);
+
+      const hex = g.append("path")
+        .attr("d", polygonPath(x, y))
+        .attr("fill", cell ? getRankColor(cell.rank) : "#ffffff")
+        .attr("stroke", "#888");
+      if (cell) applyTooltip(hex, cell);
+
+      if (cell) {
+        const textColor = getTextColorByFighter(cell.fighter);
+
+        const rankText = g.append("text")
+          .attr("x", x)
+          .attr("y", y - 12)
+          .attr("text-anchor", "middle")
+          .attr("font-size", "10px")
+          .attr("fill", "#444")
+          .text(`R${cell.rank}`);
+        applyTooltip(rankText, cell);
+
+        const fighterText = g.append("text")
+          .attr("x", x)
+          .attr("y", y + 0)
+          .attr("text-anchor", "middle")
+          .attr("font-size", "11px")
+          .attr("fill", textColor)
+          .text(cell.fighter);
+        applyTooltip(fighterText, cell);
+
+        const coordText = g.append("text")
+          .attr("x", x)
+          .attr("y", y + 12)
+          .attr("text-anchor", "middle")
+          .attr("font-size", "9px")
+          .attr("fill", "#333")
+          .text(`(${col},${row})`);
+        applyTooltip(coordText, cell);
+      }
+    }
+  }
+
+  const [centerX, centerY] = hexToPixel(Math.floor((colMin + colMax) / 2), Math.floor((rowMin + rowMax) / 2));
+  svg.call(zoom.transform, d3.zoomIdentity.translate(window.innerWidth / 2 - centerX, window.innerHeight / 2 - centerY).scale(1));
+});
+</script>
+</body>
+</html>
