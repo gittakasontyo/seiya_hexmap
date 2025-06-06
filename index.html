@@ -38,6 +38,12 @@
   </style>
 </head>
 <body>
+<div style="padding: 4px; background: #eee;">
+  敵を選択：
+  <select id="enemySelector">
+    <option value="">（すべて表示）</option>
+  </select>
+</div>
 <svg id="hexmap"></svg>
 <div class="tooltip-wrapper" id="tooltipWrapper">
   <div id="tooltip"></div>
@@ -163,10 +169,27 @@ d3.csv(csvUrl).then(rawData => {
       };
     });
 
+
+  const enemySet = new Set();
+  data.forEach(d => {
+    [d.enemy1, d.enemy2, d.enemy3].forEach(enemy => {
+      if (enemy && enemy.trim()) enemySet.add(enemy.trim());
+    });
+  });
+
+const enemyList = Array.from(enemySet).sort();
+const selector = d3.select("#enemySelector");
+enemyList.forEach(enemy => {
+  selector.append("option").attr("value", enemy).text(enemy);
+});
+
+
   const dataMap = new Map(data.map(d => [`${d.col},${d.row}`, d]));
   const cols = data.map(d => d.col), rows = data.map(d => d.row);
   const colMin = Math.min(...cols) - 1, colMax = Math.max(...cols) + 1;
   const rowMin = Math.min(...rows) - 1, rowMax = Math.max(...rows) + 1;
+
+
 
   for (let row = rowMin; row <= rowMax; row++) {
     for (let col = colMin; col <= colMax; col++) {
@@ -212,6 +235,22 @@ d3.csv(csvUrl).then(rawData => {
       }
     }
   }
+
+selector.on("change", () => {
+  const selected = selector.property("value");
+  g.selectAll("path").attr("stroke", "#888").attr("stroke-width", 1);
+
+  if (!selected) return;
+
+  g.selectAll("path").each(function(_, i) {
+    const key = [...dataMap.keys()][i];
+    const cell = dataMap.get(key);
+    if (!cell) return;
+    if ([cell.enemy1, cell.enemy2, cell.enemy3].includes(selected)) {
+      d3.select(this).attr("stroke", "#000").attr("stroke-width", 3);
+    }
+  });
+});
 
   const [centerX, centerY] = hexToPixel(Math.floor((colMin + colMax) / 2), Math.floor((rowMin + rowMax) / 2));
   svg.call(zoom.transform, d3.zoomIdentity.translate(window.innerWidth / 2 - centerX, window.innerHeight / 2 - centerY).scale(1));
