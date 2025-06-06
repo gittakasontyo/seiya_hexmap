@@ -2,55 +2,37 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>ヘキサマップ（ランク上部表示）</title>
+  <title>スマホ対応ヘキサマップ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <style>
-    body { margin: 0; }
-    svg { width: 100vw; height: 100vh; background-color: #f9f9f9; }
-
-    .tooltip-wrapper {
-      transform-origin: top left;
-      position: absolute;
-      z-index: 10;
-      pointer-events: none;
-    }
+    body { margin: 0; font-family: sans-serif; }
+    svg { width: 100vw; height: 100vh; background: #f9f9f9; }
+    select { font-size: 18px; padding: 4px; }
 
     #tooltip {
+      position: absolute;
       display: none;
-      background-color: rgba(255, 255, 255, 0.95);
-      border: 1px solid #888;
-      padding: 6px 10px;
-      font-size: 14px;
-      line-height: 1.5;
-      max-width: 300px;
-      white-space: pre-line;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid #666;
+      padding: 8px 10px;
+      font-size: 18px;
       border-radius: 6px;
-    }
-
-    @media (hover: none) and (pointer: coarse) {
-      #tooltip {
-        font-size: 20px;
-        padding: 12px 16px;
-        max-width: 90vw;
-      }
+      max-width: 90vw;
+      z-index: 100;
+      pointer-events: none;
     }
   </style>
 </head>
 <body>
-<div style="padding: 4px; background: #eee;">
-  敵を選択：
-  <select id="enemySelector">
-    <option value="">（すべて表示）</option>
-  </select>
+<div style="padding: 6px; background: #eee;">
+  敵選択：<select id="enemySelector"><option value="">（すべて表示）</option></select>
 </div>
 <svg id="hexmap"></svg>
-<div class="tooltip-wrapper" id="tooltipWrapper">
-  <div id="tooltip"></div>
-</div>
+<div id="tooltip"></div>
 <script>
 const csvUrl = "seiyaMap.csv?t=" + new Date().getTime();
-const hexRadius = 40;
+const hexRadius = 36;
 const sqrt3 = Math.sqrt(3);
 
 function hexToPixel(col, row) {
@@ -64,188 +46,98 @@ function polygonPath(x, y) {
   let path = "";
   for (let i = 0; i < 6; i++) {
     const angle = Math.PI / 180 * (60 * i - 30);
-    const px = x + hexRadius * Math.cos(angle);
-    const py = y + hexRadius * Math.sin(angle);
-    path += (i === 0 ? "M" : "L") + px + "," + py;
+    path += (i === 0 ? "M" : "L") + (x + hexRadius * Math.cos(angle)) + "," + (y + hexRadius * Math.sin(angle));
   }
   return path + "Z";
 }
 
-function isTouchDevice() {
-  return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-}
-
 function getRankColor(rank) {
-  const match = rank.match(/\d+/);
-  const rankNum = match ? parseInt(match[0]) : null;
-  switch (rankNum) {
-    case 1: return "#cccccc";
-    case 2: return "#ffff99";
-    case 3: return "#ffcc66";
-    case 4: return "#ff9966";
-    case 5: return "#ff6666";
-    case 6: return "#cc3333";
-    default: return "#ffffff";
-  }
+  const r = parseInt(rank);
+  return ["#ccc", "#ffff99", "#ffcc66", "#ff9966", "#ff6666", "#cc3333"][r - 1] || "#fff";
 }
 
-function getTextColorByFighter(fighter = "") {
-  if (fighter.includes("風")) return "#007700";
-  if (fighter.includes("水")) return "#005577";
-  if (fighter.includes("火") || fighter.includes("炎")) return "#cc0000";
-  if (fighter.includes("土")) return "#8b4513";
-  if (fighter.includes("光")) return "#ccaa00";
-  if (fighter.includes("闇")) return "#660099";
-  return "#000000";
-}
-
-function applyTooltip(selection, cell) {
-  selection
-    .on("mouseover", () => {
-      if (!isTouchDevice()) {
-        tooltip
-          .style("display", "block")
-          .html(`<strong>${cell.fighter}</strong><br>` +
-            (cell.enemy1 ? `敵1: ${cell.enemy1}<br>` : "") +
-            (cell.enemy2 ? `敵2: ${cell.enemy2}<br>` : "") +
-            (cell.enemy3 ? `敵3: ${cell.enemy3}` : ""));
-      }
-    })
-    .on("mousemove", (event) => {
-      if (!isTouchDevice()) {
-        tooltipWrapper
-          .style("left", `${event.pageX + 10}px`)
-          .style("top", `${event.pageY + 10}px`);
-      }
-    })
-    .on("mouseout", () => {
-      if (!isTouchDevice()) tooltip.style("display", "none");
-    })
-    .on("click", (event) => {
-      if (isTouchDevice()) {
-        event.stopPropagation();
-        tooltip
-          .style("display", tooltip.style("display") === "block" ? "none" : "block")
-          .html(`<strong>${cell.fighter}</strong><br>` +
-            (cell.enemy1 ? `敵1: ${cell.enemy1}<br>` : "") +
-            (cell.enemy2 ? `敵2: ${cell.enemy2}<br>` : "") +
-            (cell.enemy3 ? `敵3: ${cell.enemy3}` : ""));
-        tooltipWrapper
-          .style("left", `${event.pageX + 10}px`)
-          .style("top", `${event.pageY + 10}px`);
-      }
-    });
+function getTextColorByFighter(f) {
+  if (f.includes("風")) return "#007700";
+  if (f.includes("水")) return "#005577";
+  if (f.includes("火") || f.includes("炎")) return "#cc0000";
+  if (f.includes("土")) return "#8b4513";
+  if (f.includes("光")) return "#ccaa00";
+  if (f.includes("闇")) return "#660099";
+  return "#000";
 }
 
 const svg = d3.select("#hexmap");
 const g = svg.append("g");
 const tooltip = d3.select("#tooltip");
-const tooltipWrapper = d3.select("#tooltipWrapper");
 const selector = d3.select("#enemySelector");
 
-const zoom = d3.zoom()
-  .scaleExtent([0.2, 5])
-  .on("zoom", (event) => {
-    const transform = event.transform;
-    g.attr("transform", transform);
-    tooltipWrapper.style("transform", `scale(${transform.k})`);
-  });
-
+const zoom = d3.zoom().scaleExtent([0.5, 5]).on("zoom", e => g.attr("transform", e.transform));
 svg.call(zoom);
-document.body.addEventListener("click", () => tooltip.style("display", "none"));
 
-let cellElements = [];
-
-d3.csv(csvUrl).then(rawData => {
-  const data = rawData
-    .filter(d => d["エリア"])
-    .map(d => {
-      const area = parseFloat(d["エリア"]);
-      return {
-        col: Math.floor(area),
-        row: Math.round((area % 1) * 100),
-        rank: d["タウンランク"] || "",
-        fighter: d["派遣闘士"] || "",
-        enemy1: d["敵①"] || "",
-        enemy2: d["敵②"] || "",
-        enemy3: d["敵③"] || ""
-      };
-    });
+fetch(csvUrl).then(r => r.text()).then(text => {
+  const rows = d3.csvParse(text);
+  const data = rows.filter(d => d["エリア"]).map(d => {
+    const area = parseFloat(d["エリア"]);
+    return {
+      col: Math.floor(area),
+      row: Math.round((area % 1) * 100),
+      rank: d["タウンランク"] || "",
+      fighter: d["派遣闘士"] || "",
+      enemy1: d["敵①"] || "",
+      enemy2: d["敵②"] || "",
+      enemy3: d["敵③"] || ""
+    };
+  });
 
   const enemySet = new Set();
-  data.forEach(d => {
-    [d.enemy1, d.enemy2, d.enemy3].forEach(enemy => {
-      if (enemy && enemy.trim()) enemySet.add(enemy.trim());
+  data.forEach(d => [d.enemy1, d.enemy2, d.enemy3].forEach(e => e && enemySet.add(e.trim())));
+  [...enemySet].sort().forEach(e => selector.append("option").attr("value", e).text(e));
+
+  const dataMap = new Map(data.map(d => [`${d.col},${d.row}`, d]));
+  const hexes = [];
+
+  data.forEach(cell => {
+    const [x, y] = hexToPixel(cell.col, cell.row);
+    const group = g.append("g");
+
+    const hex = group.append("path")
+      .attr("d", polygonPath(x, y))
+      .attr("fill", getRankColor(cell.rank))
+      .attr("stroke", "#888");
+
+    const rank = group.append("text")
+      .attr("x", x).attr("y", y - 12).attr("text-anchor", "middle")
+      .attr("font-size", "11px").attr("fill", "#444").text(`R${cell.rank}`);
+
+    const fighter = group.append("text")
+      .attr("x", x).attr("y", y + 0).attr("text-anchor", "middle")
+      .attr("font-size", "13px").attr("fill", getTextColorByFighter(cell.fighter)).text(cell.fighter);
+
+    const coord = group.append("text")
+      .attr("x", x).attr("y", y + 13).attr("text-anchor", "middle")
+      .attr("font-size", "9px").attr("fill", "#333").text(`(${cell.col},${cell.row})`);
+
+    [hex, rank, fighter, coord].forEach(el => {
+      el.on("click", e => {
+        tooltip.style("left", `${e.pageX + 5}px`).style("top", `${e.pageY + 5}px`)
+          .html(`<strong>${cell.fighter}</strong><br>${cell.enemy1 || ""}<br>${cell.enemy2 || ""}<br>${cell.enemy3 || ""}`)
+          .style("display", "block");
+      });
     });
+
+    hexes.push({ cell, element: hex });
   });
-
-  const enemyList = Array.from(enemySet).sort();
-  enemyList.forEach(enemy => {
-    selector.append("option").attr("value", enemy).text(enemy);
-  });
-
-  const cols = data.map(d => d.col), rows = data.map(d => d.row);
-  const colMin = Math.min(...cols) - 1, colMax = Math.max(...cols) + 1;
-  const rowMin = Math.min(...rows) - 1, rowMax = Math.max(...rows) + 1;
-
-  for (let row = rowMin; row <= rowMax; row++) {
-    for (let col = colMin; col <= colMax; col++) {
-      const cell = data.find(d => d.col === col && d.row === row);
-      const [x, y] = hexToPixel(col, row);
-      const color = cell ? getRankColor(cell.rank) : "#ffffff";
-
-      const hex = g.append("path")
-        .attr("d", polygonPath(x, y))
-        .attr("fill", color)
-        .attr("stroke", "#888")
-        .datum(cell);
-
-      cellElements.push(hex);
-      if (cell) applyTooltip(hex, cell);
-
-      if (cell) {
-        const textColor = getTextColorByFighter(cell.fighter);
-        g.append("text")
-          .attr("x", x)
-          .attr("y", y - 12)
-          .attr("text-anchor", "middle")
-          .attr("font-size", "10px")
-          .attr("fill", "#444")
-          .text(`R${cell.rank}`);
-
-        g.append("text")
-          .attr("x", x)
-          .attr("y", y + 0)
-          .attr("text-anchor", "middle")
-          .attr("font-size", "11px")
-          .attr("fill", textColor)
-          .text(cell.fighter);
-
-        g.append("text")
-          .attr("x", x)
-          .attr("y", y + 12)
-          .attr("text-anchor", "middle")
-          .attr("font-size", "9px")
-          .attr("fill", "#333")
-          .text(`(${col},${row})`);
-      }
-    }
-  }
 
   selector.on("change", () => {
-    const selected = selector.property("value");
-    cellElements.forEach(hex => {
-      const cell = hex.datum();
-      if (!cell) return;
-      const enemies = [cell.enemy1, cell.enemy2, cell.enemy3];
-      const match = selected && enemies.includes(selected);
-      hex.attr("fill", match || !selected ? getRankColor(cell.rank) : "#cccccc");
+    const sel = selector.property("value");
+    hexes.forEach(({ cell, element }) => {
+      const match = [cell.enemy1, cell.enemy2, cell.enemy3].includes(sel);
+      element.attr("fill", match ? "#00ffff" : getRankColor(cell.rank));
     });
   });
-
-  const [centerX, centerY] = hexToPixel(Math.floor((colMin + colMax) / 2), Math.floor((rowMin + rowMax) / 2));
-  svg.call(zoom.transform, d3.zoomIdentity.translate(window.innerWidth / 2 - centerX, window.innerHeight / 2 - centerY).scale(1));
 });
+
+document.body.addEventListener("click", () => tooltip.style("display", "none"));
 </script>
 </body>
 </html>
