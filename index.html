@@ -134,7 +134,7 @@ const zoom = d3.zoom()
     const scale = transform.k;
    // ✅ スマホは固定サイズ、PCはスケーリング
    const isMobile = window.innerWidth < 768;
-   const scaledSize = isMobile ? 12 : Math.max(6, Math.min(12, 8 * scale));
+   const scaledSize = isMobile ? 24 : Math.max(6, Math.min(12, 8 * scale));
    tooltip.style("font-size", `${scaledSize}px`);
   });
 svg.call(zoom);
