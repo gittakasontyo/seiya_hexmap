@@ -141,6 +141,7 @@ const svg = d3.select("#hexmap");
 const g = svg.append("g");
 const tooltip = d3.select("#tooltip");
 const tooltipWrapper = d3.select("#tooltipWrapper");
+const selector = d3.select("#enemySelector");
 
 const zoom = d3.zoom()
   .scaleExtent([0.2, 5])
@@ -152,6 +153,8 @@ const zoom = d3.zoom()
 
 svg.call(zoom);
 document.body.addEventListener("click", () => tooltip.style("display", "none"));
+
+let cellElements = [];
 
 d3.csv(csvUrl).then(rawData => {
   const data = rawData
@@ -169,7 +172,6 @@ d3.csv(csvUrl).then(rawData => {
       };
     });
 
-
   const enemySet = new Set();
   data.forEach(d => {
     [d.enemy1, d.enemy2, d.enemy3].forEach(enemy => {
@@ -177,80 +179,69 @@ d3.csv(csvUrl).then(rawData => {
     });
   });
 
-const enemyList = Array.from(enemySet).sort();
-const selector = d3.select("#enemySelector");
-enemyList.forEach(enemy => {
-  selector.append("option").attr("value", enemy).text(enemy);
-});
+  const enemyList = Array.from(enemySet).sort();
+  enemyList.forEach(enemy => {
+    selector.append("option").attr("value", enemy).text(enemy);
+  });
 
-
-  const dataMap = new Map(data.map(d => [`${d.col},${d.row}`, d]));
   const cols = data.map(d => d.col), rows = data.map(d => d.row);
   const colMin = Math.min(...cols) - 1, colMax = Math.max(...cols) + 1;
   const rowMin = Math.min(...rows) - 1, rowMax = Math.max(...rows) + 1;
 
-
-
   for (let row = rowMin; row <= rowMax; row++) {
     for (let col = colMin; col <= colMax; col++) {
+      const cell = data.find(d => d.col === col && d.row === row);
       const [x, y] = hexToPixel(col, row);
-      const key = `${col},${row}`;
-      const cell = dataMap.get(key);
+      const color = cell ? getRankColor(cell.rank) : "#ffffff";
 
       const hex = g.append("path")
         .attr("d", polygonPath(x, y))
-        .attr("fill", cell ? getRankColor(cell.rank) : "#ffffff")
-        .attr("stroke", "#888");
+        .attr("fill", color)
+        .attr("stroke", "#888")
+        .datum(cell);
+
+      cellElements.push(hex);
       if (cell) applyTooltip(hex, cell);
 
       if (cell) {
         const textColor = getTextColorByFighter(cell.fighter);
-
-        const rankText = g.append("text")
+        g.append("text")
           .attr("x", x)
           .attr("y", y - 12)
           .attr("text-anchor", "middle")
           .attr("font-size", "10px")
           .attr("fill", "#444")
           .text(`R${cell.rank}`);
-        applyTooltip(rankText, cell);
 
-        const fighterText = g.append("text")
+        g.append("text")
           .attr("x", x)
           .attr("y", y + 0)
           .attr("text-anchor", "middle")
           .attr("font-size", "11px")
           .attr("fill", textColor)
           .text(cell.fighter);
-        applyTooltip(fighterText, cell);
 
-        const coordText = g.append("text")
+        g.append("text")
           .attr("x", x)
           .attr("y", y + 12)
           .attr("text-anchor", "middle")
           .attr("font-size", "9px")
           .attr("fill", "#333")
           .text(`(${col},${row})`);
-        applyTooltip(coordText, cell);
       }
     }
   }
 
-selector.on("change", () => {
-  const selected = selector.property("value");
-  g.selectAll("path").attr("stroke", "#888").attr("stroke-width", 1);
-
-  if (!selected) return;
-
-  g.selectAll("path").each(function(_, i) {
-    const key = [...dataMap.keys()][i];
-    const cell = dataMap.get(key);
-    if (!cell) return;
-    if ([cell.enemy1, cell.enemy2, cell.enemy3].includes(selected)) {
-      d3.select(this).attr("stroke", "#000").attr("stroke-width", 3);
-    }
+  selector.on("change", () => {
+    const selected = selector.property("value");
+    cellElements.forEach(hex => {
+      const cell = hex.datum();
+      if (!cell) return;
+      const enemies = [cell.enemy1, cell.enemy2, cell.enemy3];
+      const match = selected && enemies.includes(selected);
+      hex.attr("fill", match || !selected ? getRankColor(cell.rank) : "#cccccc");
+    });
   });
-});
 
   const [centerX, centerY] = hexToPixel(Math.floor((colMin + colMax) / 2), Math.floor((rowMin + rowMax) / 2));
   svg.call(zoom.transform, d3.zoomIdentity.translate(window.innerWidth / 2 - centerX, window.innerHeight / 2 - centerY).scale(1));
